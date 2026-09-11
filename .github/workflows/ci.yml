@@ -31,13 +31,14 @@ jobs:
     # than tests, because the floor is a promise to people who depend on this
     # crate, and they never compile its dev-dependencies.
     #
-    # The floor is 1.85 and not lower because that is where a toolchain can
-    # still read the dependency tree. An older cargo has no MSRV-aware
-    # resolver, so it takes the newest version of every transitive dependency;
-    # rustls pulls one that declares edition 2024, which cargo could not parse
-    # before 1.85. A lower number here would be a claim no one could act on.
+    # The floor is what the dependency tree actually needs, found by running
+    # this job rather than guessed. 1.75 failed because a cargo that old has no
+    # MSRV-aware resolver and cannot even parse a transitive dependency
+    # declaring edition 2024. 1.85 then reported the real constraint plainly:
+    # icu_collections, which arrives under url, requires 1.88. A lower number
+    # here would be a claim no one could act on.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.88.0
       - run: cargo build
