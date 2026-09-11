@@ -13,7 +13,7 @@ Validate IBANs across 92 countries, validate up to 100 IBANs per request, extrac
 cargo add ibanchecker
 ```
 
-Requires Rust 1.75 or newer. The client is async and built on `reqwest` with `rustls`, so it needs no system OpenSSL.
+Requires Rust 1.85 or newer. The client is async and built on `reqwest` with `rustls`, so it needs no system OpenSSL.
 
 ## Quick start
 

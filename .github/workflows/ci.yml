@@ -30,8 +30,14 @@ jobs:
     # Builds the library on the floor declared in Cargo.toml. It builds rather
     # than tests, because the floor is a promise to people who depend on this
     # crate, and they never compile its dev-dependencies.
+    #
+    # The floor is 1.85 and not lower because that is where a toolchain can
+    # still read the dependency tree. An older cargo has no MSRV-aware
+    # resolver, so it takes the newest version of every transitive dependency;
+    # rustls pulls one that declares edition 2024, which cargo could not parse
+    # before 1.85. A lower number here would be a claim no one could act on.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.75.0
+      - uses: dtolnay/rust-toolchain@1.85.0
       - run: cargo build
