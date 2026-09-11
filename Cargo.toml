@@ -11,8 +11,8 @@ documentation = "https://docs.rs/ibanchecker"
 readme = "README.md"
 keywords = ["iban", "bic", "swift", "sepa", "fintech"]
 categories = ["api-bindings", "finance"]
-# Our own release runbook, not something every consumer should unpack.
-exclude = ["PUBLISHING.md"]
+# Our own release machinery, not something every consumer should unpack.
+exclude = ["PUBLISHING.md", ".github/", ".gitignore"]
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2"] }
