@@ -32,10 +32,10 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// Sets the API key. [`Client::validate`], [`Client::validate_bulk`] and
-    /// [`Client::extract`] need one; [`Client::country_format`] and
-    /// [`Client::lookup_bic`] work without it, limited to 100 requests an hour
-    /// per IP. An empty key counts as no key.
+    /// Sets the API key. Every method except [`Client::country_format`] needs
+    /// one, and what a key can call follows its plan (see the crate docs).
+    /// [`Client::country_format`] works without it, limited to 100 requests an
+    /// hour per IP. An empty key counts as no key.
     pub fn api_key(mut self, key: impl Into<String>) -> Self {
         let key = key.into();
         self.api_key = if key.is_empty() { None } else { Some(key) };
@@ -97,8 +97,9 @@ impl ClientBuilder {
 impl Client {
     /// A client with no API key, pointed at production.
     ///
-    /// Enough for [`Client::country_format`] and [`Client::lookup_bic`].
-    /// Validation and extraction need a key: use [`Client::with_api_key`].
+    /// Enough for [`Client::country_format`] only. Every other method,
+    /// [`Client::lookup_bic`] included, needs a key: use
+    /// [`Client::with_api_key`].
     ///
     /// # Panics
     ///
@@ -130,7 +131,8 @@ impl Client {
     /// A malformed IBAN is not an error: the result comes back with `valid`
     /// false and an `error` plus `error_code` explaining why.
     ///
-    /// Needs an API key. Without one this returns [`Error::Authentication`].
+    /// Needs an API key; a free key covers it. Without one this returns
+    /// [`Error::Authentication`]. Counts one request.
     pub async fn validate(&self, iban: &str) -> Result<ValidationResult> {
         self.request(Method::POST, "/validate", Some(json!({ "iban": iban })))
             .await
@@ -139,7 +141,14 @@ impl Client {
     /// Validates up to 100 IBANs in one request. Results come back in the same
     /// order as the input.
     ///
-    /// Needs an API key. Without one this returns [`Error::Authentication`].
+    /// Needs an API key on the Basic plan or above. Without a key this returns
+    /// [`Error::Authentication`]; with a key whose plan lacks it, [`Error::Api`]
+    /// with status 403 and code `PLAN_REQUIRED`. A key whose email address has
+    /// a verified account at <https://ibanchecker.cash/dashboard> can try it
+    /// with up to 10 IBANs per call; a trial call over that returns
+    /// [`Error::BadRequest`] with code `TOO_MANY_IBANS`.
+    ///
+    /// Counts one request per IBAN.
     pub async fn validate_bulk<I, S>(&self, ibans: I) -> Result<BatchResult>
     where
         I: IntoIterator<Item = S>,
@@ -157,7 +166,14 @@ impl Client {
     /// Scans free text (emails, invoices) for IBAN-shaped strings and
     /// validates each candidate. Up to 50,000 characters per request.
     ///
-    /// Needs an API key. Without one this returns [`Error::Authentication`].
+    /// Needs an API key on the Growth plan or above. Without a key this returns
+    /// [`Error::Authentication`]; with a key whose plan lacks it, [`Error::Api`]
+    /// with status 403 and code `PLAN_REQUIRED`. A key whose email address has
+    /// a verified account at <https://ibanchecker.cash/dashboard> can try it
+    /// with up to 5,000 characters per call; a trial call over that returns
+    /// [`Error::BadRequest`] with code `TEXT_TOO_LONG`.
+    ///
+    /// Counts one request per IBAN found, at least one per call.
     pub async fn extract(&self, text: &str) -> Result<BatchResult> {
         self.request(Method::POST, "/extract", Some(json!({ "text": text })))
             .await
@@ -166,7 +182,8 @@ impl Client {
     /// The IBAN format specification for an ISO 3166-1 alpha-2 country code,
     /// for example `"DE"`.
     ///
-    /// Works without an API key, limited to 100 requests an hour per IP.
+    /// Works without an API key, limited to 100 requests an hour per IP; past
+    /// that this returns [`Error::RateLimit`] with code `RATE_LIMIT_EXCEEDED`.
     pub async fn country_format(&self, country: &str) -> Result<FormatSpec> {
         let path = format!("/formats/{}", escape(&country.to_lowercase()));
         self.request(Method::GET, &path, None).await
@@ -174,7 +191,12 @@ impl Client {
 
     /// Resolves an 8 or 11 character ISO 9362 BIC to a bank record.
     ///
-    /// Works without an API key, limited to 100 requests an hour per IP.
+    /// Needs an API key on the Basic plan or above. Without a key this returns
+    /// [`Error::Authentication`]; with a key whose plan lacks it, [`Error::Api`]
+    /// with status 403 and code `PLAN_REQUIRED`. A key whose email address has
+    /// a verified account at <https://ibanchecker.cash/dashboard> can try it.
+    ///
+    /// Counts one request.
     pub async fn lookup_bic(&self, bic: &str) -> Result<BankRecord> {
         let path = format!("/swift/{}", escape(&bic.to_uppercase()));
         self.request(Method::GET, &path, None).await

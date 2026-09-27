@@ -5,13 +5,25 @@
 //! extract IBANs from free text, look up country format specifications and
 //! resolve SWIFT/BIC codes.
 //!
-//! [`Client::validate`], [`Client::validate_bulk`] and [`Client::extract`]
-//! need an API key; without one they return [`Error::Authentication`]. A free
-//! key covers 100 requests a month and arrives by email in seconds: request it
-//! at <https://ibanchecker.cash/api-docs>. Paid plans are at
-//! <https://ibanchecker.cash/pricing>. [`Client::country_format`] and
-//! [`Client::lookup_bic`] work without a key, limited to 100 requests an hour
-//! per IP.
+//! Every method except [`Client::country_format`] needs an API key, including
+//! [`Client::lookup_bic`]; without one the API answers 401 and the call returns
+//! [`Error::Authentication`]. A free key arrives by email in seconds: request
+//! it at <https://ibanchecker.cash/api-docs>. Paid plans are at
+//! <https://ibanchecker.cash/pricing>.
+//!
+//! What a key can call follows its plan. A free key covers
+//! [`Client::validate`] only, 100 requests a month. [`Client::validate_bulk`]
+//! and [`Client::lookup_bic`] need the Basic plan or above, and
+//! [`Client::extract`] the Growth plan or above. A call outside the key's plan
+//! returns [`Error::Api`] with status 403 and code `PLAN_REQUIRED`. A key whose
+//! email address has a verified account at <https://ibanchecker.cash/dashboard>
+//! can try the methods its plan lacks, with smaller limits per call.
+//!
+//! [`Client::validate`] and [`Client::lookup_bic`] count one request per call.
+//! [`Client::validate_bulk`] counts one request per IBAN and
+//! [`Client::extract`] one per IBAN found (at least one per call).
+//! [`Client::country_format`] works without a key, limited to 100 requests an
+//! hour per IP.
 //!
 //! ```no_run
 //! # async fn run() -> Result<(), ibanchecker::Error> {
@@ -30,8 +42,8 @@
 //!
 //! A malformed IBAN is not an error: [`Client::validate`] returns a
 //! [`ValidationResult`] with `valid` false and an `error` plus `error_code`
-//! explaining why. [`Error`] is returned for transport, authentication, quota
-//! and server-side problems only.
+//! explaining why. [`Error`] is returned for transport, authentication, plan,
+//! quota and server-side problems only.
 //!
 //! # Tri-state fields
 //!

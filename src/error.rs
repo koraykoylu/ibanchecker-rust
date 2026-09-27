@@ -6,19 +6,30 @@ use serde_json::Value;
 ///
 /// A malformed IBAN is not an error: [`crate::Client::validate`] returns a
 /// [`crate::ValidationResult`] with `valid` false. These are returned for
-/// transport, authentication, quota and server-side problems only.
+/// transport, authentication, plan, quota and server-side problems only.
 #[derive(Debug)]
 pub enum Error {
-    /// HTTP 400: the request was malformed.
+    /// HTTP 400: the request was malformed, or a trial call went over the
+    /// trial size (`TOO_MANY_IBANS` for bulk validation, `TEXT_TOO_LONG` for
+    /// extraction).
     BadRequest(ApiError),
     /// HTTP 401: the API key is missing, invalid or inactive.
+    ///
+    /// Every method except [`crate::Client::country_format`] needs a key, so
+    /// [`crate::Client::lookup_bic`] called without one also gets this
+    /// variant, from the API's 401.
     Authentication(ApiError),
     /// HTTP 404: no such country code or BIC.
     NotFound(ApiError),
-    /// HTTP 429: a key used up its monthly requests (`QUOTA_EXCEEDED`), or
-    /// keyless lookups passed 100 an hour per IP (`RATE_LIMIT_EXCEEDED`).
+    /// HTTP 429: a call cost more than the key's requests left this month
+    /// (`QUOTA_EXCEEDED`), or keyless country format lookups passed 100 an
+    /// hour per IP (`RATE_LIMIT_EXCEEDED`).
     RateLimit(ApiError),
     /// Any other error status, or a response body that could not be read.
+    ///
+    /// This includes HTTP 403 with code `PLAN_REQUIRED`, returned when the
+    /// key's plan does not include the method; the body carries
+    /// `required_plan` (`basic` or `growth`) and `upgrade_url`.
     Api(ApiError),
     /// The request never reached the API: DNS, TLS, connection or timeout.
     Transport(reqwest::Error),
