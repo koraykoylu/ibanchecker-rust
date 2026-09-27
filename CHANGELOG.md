@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.1
+
+Documentation for the API's key requirement, live since 27 September 2026.
+No change in behaviour.
+
+- `validate`, `validate_bulk` and `extract` need an API key; without one the
+  API answers 401 and the client returns `Error::Authentication`. The README
+  quick start and the crate docs now build the client with a key
+- A free key covers 100 requests a month; over the quota the API answers 429
+  `QUOTA_EXCEEDED` with `retry_after` and `upgrade_url` in the body
+- `country_format` and `lookup_bic` still work without a key, limited to 100
+  requests an hour per IP
+
 ## 0.1.0
 
 First release.

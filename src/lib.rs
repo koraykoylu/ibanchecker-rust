@@ -5,12 +5,18 @@
 //! extract IBANs from free text, look up country format specifications and
 //! resolve SWIFT/BIC codes.
 //!
-//! An API key is optional. Without one, requests are limited to 100 per hour
-//! per IP. Get a free key at <https://ibanchecker.cash/api-docs>.
+//! [`Client::validate`], [`Client::validate_bulk`] and [`Client::extract`]
+//! need an API key; without one they return [`Error::Authentication`]. A free
+//! key covers 100 requests a month and arrives by email in seconds: request it
+//! at <https://ibanchecker.cash/api-docs>. Paid plans are at
+//! <https://ibanchecker.cash/pricing>. [`Client::country_format`] and
+//! [`Client::lookup_bic`] work without a key, limited to 100 requests an hour
+//! per IP.
 //!
 //! ```no_run
 //! # async fn run() -> Result<(), ibanchecker::Error> {
-//! let client = ibanchecker::Client::new();
+//! let api_key = std::env::var("IBANCHECKER_API_KEY").expect("set IBANCHECKER_API_KEY");
+//! let client = ibanchecker::Client::with_api_key(api_key);
 //!
 //! let result = client.validate("DE89 3704 0044 0532 0130 00").await?;
 //! if result.valid {

@@ -22,7 +22,10 @@ use ibanchecker::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), ibanchecker::Error> {
-    let client = Client::new(); // no API key needed for light use (100 requests/hour per IP)
+    // validate, validate_bulk and extract need an API key; a free one covers
+    // 100 requests a month: https://ibanchecker.cash/api-docs
+    let api_key = std::env::var("IBANCHECKER_API_KEY").expect("set IBANCHECKER_API_KEY");
+    let client = Client::with_api_key(api_key);
 
     let result = client.validate("DE89 3704 0044 0532 0130 00").await?;
 
@@ -40,26 +43,33 @@ async fn main() -> Result<(), ibanchecker::Error> {
 
 ## Authentication
 
-An API key is optional. Without one, requests are limited to 100 per hour per IP. With a key, requests count against your plan quota. Get a free key at [ibanchecker.cash/api-docs](https://ibanchecker.cash/api-docs).
+`validate`, `validate_bulk` and `extract` need an API key. Without one they return `Error::Authentication` (HTTP 401, code `UNAUTHORIZED`). Request a free key at [ibanchecker.cash/api-docs](https://ibanchecker.cash/api-docs); it arrives by email in seconds and covers 100 requests a month. Paid plans with higher quotas are at [ibanchecker.cash/pricing](https://ibanchecker.cash/pricing).
+
+`country_format` and `lookup_bic` work without a key, limited to 100 requests an hour per IP.
 
 ```rust
-let client = Client::with_api_key("iban_your_api_key");
+let client = Client::with_api_key("YOUR_API_KEY");
 
 let client = Client::builder()
     .api_key(std::env::var("IBANCHECKER_API_KEY").unwrap_or_default())
     .timeout(std::time::Duration::from_secs(3))
     .build()?;
+
+// Format and BIC lookups only: no key needed.
+let client = Client::new();
 ```
+
+The key is sent as `Authorization: Bearer <key>`.
 
 ## Methods
 
-| Method | Description |
-| --- | --- |
-| `validate(iban)` | Validate a single IBAN. Returns a `ValidationResult`. |
-| `validate_bulk(ibans)` | Validate up to 100 IBANs. Returns a `BatchResult`. |
-| `extract(text)` | Find and validate IBANs in free text (up to 50,000 chars). Returns a `BatchResult`. |
-| `country_format(country)` | IBAN format spec for an ISO country code. Returns a `FormatSpec`. |
-| `lookup_bic(bic)` | Resolve an 8 or 11 character BIC. Returns a `BankRecord`. |
+| Method | API key | Description |
+| --- | --- | --- |
+| `validate(iban)` | required | Validate a single IBAN. Returns a `ValidationResult`. |
+| `validate_bulk(ibans)` | required | Validate up to 100 IBANs. Returns a `BatchResult`. |
+| `extract(text)` | required | Find and validate IBANs in free text (up to 50,000 chars). Returns a `BatchResult`. |
+| `country_format(country)` | not needed | IBAN format spec for an ISO country code. Returns a `FormatSpec`. |
+| `lookup_bic(bic)` | not needed | Resolve an 8 or 11 character BIC. Returns a `BankRecord`. |
 
 ### Bulk validation
 
@@ -136,11 +146,23 @@ match client.lookup_bic("ZZZZZZZZ").await {
 | `Error::BadRequest` | HTTP 400, the request was malformed |
 | `Error::Authentication` | HTTP 401, the API key is missing, invalid or inactive |
 | `Error::NotFound` | HTTP 404, no such country code or BIC |
-| `Error::RateLimit` | HTTP 429, hourly limit or monthly quota exceeded |
+| `Error::RateLimit` | HTTP 429: `QUOTA_EXCEEDED` when a key has used its monthly requests, `RATE_LIMIT_EXCEEDED` when keyless lookups pass 100 an hour |
 | `Error::Api` | any other error status, or a body that could not be read |
 | `Error::Transport` | the request never reached the API: DNS, TLS, connection, timeout |
 
 Every variant except `Transport` carries an `ApiError` with the status, the machine-readable code and the decoded body, reachable through `Error::api()`, `Error::status()` and `Error::code()`.
+
+A `QUOTA_EXCEEDED` body also carries `retry_after`, the seconds until the quota resets on the 1st of next month (UTC), and `upgrade_url`:
+
+```rust
+if let Err(Error::RateLimit(api)) = client.validate("DE89370400440532013000").await {
+    if api.code == "QUOTA_EXCEEDED" {
+        let body = api.body.unwrap_or_default();
+        println!("Monthly quota used, resets in {} seconds", body["retry_after"]);
+        println!("Upgrade: {}", body["upgrade_url"].as_str().unwrap_or_default());
+    }
+}
+```
 
 ## Your own HTTP client
 

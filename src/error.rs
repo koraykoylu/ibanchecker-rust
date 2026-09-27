@@ -15,7 +15,8 @@ pub enum Error {
     Authentication(ApiError),
     /// HTTP 404: no such country code or BIC.
     NotFound(ApiError),
-    /// HTTP 429: the hourly rate limit or the monthly quota was exceeded.
+    /// HTTP 429: a key used up its monthly requests (`QUOTA_EXCEEDED`), or
+    /// keyless lookups passed 100 an hour per IP (`RATE_LIMIT_EXCEEDED`).
     RateLimit(ApiError),
     /// Any other error status, or a response body that could not be read.
     Api(ApiError),
